@@ -1,80 +1,59 @@
-from fastapi import FastAPI
+from fastapi import (
+    FastAPI
+)
 
-from app.database.mongodb import MongoDB
-from app.services.gemini_service import (
-    GeminiService
+from fastapi.middleware.cors import (
+    CORSMiddleware
 )
 
 from app.api.chat import (
     router as chat_router
 )
 
+from app.database.mongodb import (
+    MongoDB
+)
+
 app = FastAPI(
-    title="Dai AI Agent",
-    version="1.0.0"
+    title="Dai AI Agent"
+)
+
+# CORS
+
+app.add_middleware(
+
+    CORSMiddleware,
+
+    allow_origins=[
+        "http://localhost:5173"
+    ],
+
+    allow_credentials=True,
+
+    allow_methods=["*"],
+
+    allow_headers=["*"]
 )
 
 
-@app.on_event("startup")
-async def startup_event():
+@app.on_event(
+    "startup"
+)
+async def startup():
 
     MongoDB.connect()
-
-    GeminiService.initialize()
 
 
 app.include_router(
     chat_router,
-    prefix="/chat",
-    tags=["Chat"]
+    prefix="/chat"
 )
 
 
 @app.get("/")
-async def root():
-    return {
-        "message": "Dai Backend Running"
-    }
-
-
-@app.get("/health")
-async def health_check():
-    return {
-        "status": "healthy"
-    }
-
-
-@app.get("/health/db")
-async def db_health_check():
-
-    try:
-        db = MongoDB.get_database()
-
-        db.command("ping")
-
-        return {
-            "status": "connected",
-            "database": db.name
-        }
-
-    except Exception as e:
-        return {
-            "status": "disconnected",
-            "error": str(e)
-        }
-
-
-@app.get("/health/ai")
-async def ai_health_check():
-
-    client = GeminiService.get_client()
-
-    if client:
-        return {
-            "status": "connected",
-            "model": "gemini-2.5-flash"
-        }
+def root():
 
     return {
-        "status": "disconnected"
+        "message":
+        "Dai Backend Running"
     }
