@@ -1,7 +1,6 @@
 import os
 
 from google import genai
-from app.config.settings import settings
 
 
 class GeminiService:
@@ -12,43 +11,70 @@ class GeminiService:
     def initialize(cls):
 
         try:
+
             os.environ[
                 "GOOGLE_APPLICATION_CREDENTIALS"
-            ] = settings.GOOGLE_APPLICATION_CREDENTIALS
+            ] = (
+                "/home/"
+                "dhayanithi-anandan/"
+                "PD/TICM/"
+                "ticm-qa.json"
+            )
 
-            cls.client = genai.Client(
-                vertexai=True,
-                project=settings.GOOGLE_PROJECT_ID,
-                location=settings.GOOGLE_LOCATION
+            cls.client = (
+                genai.Client(
+                    vertexai=True,
+                    project="ticm-qa",
+                    location="us-central1"
+                )
             )
 
             print(
-                "Gemini Client Initialized Successfully"
+                "Gemini Initialized"
             )
 
         except Exception as e:
-            print(
-                f"Gemini Initialization Error: {e}"
-            )
 
-    @classmethod
-    def get_client(cls):
-        return cls.client
+            print(
+                f"Gemini Init Error: {e}"
+            )
 
     @classmethod
     async def generate_response(
         cls,
-        user_message: str
+        prompt: str
     ):
 
         try:
 
-            response = cls.client.models.generate_content(
-                model="gemini-2.5-flash",
-                contents=user_message
+            # Safety fallback
+            if cls.client is None:
+
+                cls.initialize()
+
+            response = (
+                cls.client.models.generate_content(
+                    model=
+                    "gemini-2.5-flash",
+
+                    contents=
+                    prompt
+                )
             )
 
-            return response.text
+            return (
+                response.text
+            )
 
         except Exception as e:
-            return f"Gemini Error: {str(e)}"
+
+            print(
+                f"Gemini Error: {e}"
+            )
+
+            return (
+                "Dai encountered "
+                "an AI issue."
+            )
+
+            

@@ -21,6 +21,13 @@ from app.services.memory_service import (
     MemoryService
 )
 
+from app.services.trace_service import (
+    TraceService
+)
+
+from app.services.tool_validation_service import (
+    ToolValidationService
+)
 
 router = APIRouter()
 
@@ -36,61 +43,173 @@ async def chat(
     request: ChatRequest
 ):
 
-    plan = await MCPPlanner.plan(
-        request.message
+    # Initialize Trace
+    trace = (
+        TraceService
+        .initialize()
     )
 
-    if plan["use_tool"]:
+    # Planner
+    plan = await (
+        MCPPlanner.plan(
+            request.message
+        )
+    )
+
+    TraceService.add_step(
+        trace,
+
+        "Planner Decision",
+
+        f"Tool count: "
+        f"{len(plan.get('tools', []))}"
+    )
+
+    # Tool Flow
+    if plan.get("use_tool"):
 
         tool_outputs = []
 
-        for tool in plan["tools"]:
+        for tool in (
+            plan.get(
+                "tools",
+                []
+            )
+        ):
 
-            vehicle_id = (
-                tool["arguments"]
-                .get("vehicle_id")
+            tool_name = (
+                tool.get(
+                    "tool_name"
+                )
             )
 
-            if vehicle_id:
-
-                await MemoryService.save_vehicle_context(
-                    vehicle_id
+            arguments = (
+                tool.get(
+                    "arguments",
+                    {}
                 )
-            else:
+            )
 
-                await MemoryService.clear_vehicle_context()
+            vehicle_id = (
+                arguments.get(
+                    "vehicle_id"
+                )
+            )
 
+            # Trace selected tool
+            TraceService.add_step(
+                trace,
+
+                "Tool Selected",
+
+                tool_name
+            )
+
+            # Vehicle ID validation
             if not vehicle_id:
 
                 return {
+                    "trace":
+                    trace,
+
                     "response":
-                    "Please provide the vehicle ID."
+                    (
+                        "Please provide "
+                        "the vehicle ID."
+                    )
                 }
 
-
-            result = (
-                await MCPClient.call_tool(
-                    tool["tool_name"],
-                    tool["arguments"]
+            # Save memory
+            await (
+                MemoryService
+                .save_vehicle_context(
+                    vehicle_id
                 )
+            )
+
+            # Execute MCP Tool
+            result = (
+                await MCPClient
+                .call_tool(
+                    tool_name,
+                    arguments
+                )
+            )
+
+            validation = (
+                ToolValidationService
+                .validate_tool_result(
+                    tool_name,
+                    result
+                )
+            )
+
+            if not validation["valid"]:
+
+                TraceService.add_step(
+
+                    trace,
+
+                    "Tool Failure",
+
+                    validation[
+                        "message"
+                    ]
+                )
+
+                return {
+
+                    "trace":
+                    trace,
+
+                    "response":
+                    (
+                        f"I could not "
+                        f"complete the "
+                        f"request.\n\n"
+                        f"Reason: "
+                        f"{validation['message']}"
+                    )
+                }
+
+            # Trace execution
+            TraceService.add_step(
+                trace,
+
+                "Tool Executed",
+
+                tool_name
             )
 
             tool_outputs.append({
 
                 "tool_name":
-                tool["tool_name"],
+                tool_name,
 
                 "result":
                 result
             })
 
-        final_prompt = load_prompt(
-            "response_prompt.txt",
-            user_query=
-            request.message,
+        # Final response prompt
+        final_prompt = (
+            load_prompt(
+                "response_prompt.txt",
 
-            tool_results=
-            tool_outputs
+                user_query=
+                request.message,
+
+                tool_results=
+                tool_outputs
+            )
+        )
+
+        TraceService.add_step(
+            trace,
+
+            "Response Generation",
+
+            "Gemini synthesizing "
+            "tool outputs"
         )
 
         response = (
@@ -102,6 +221,9 @@ async def chat(
 
         return {
 
+            "trace":
+            trace,
+
             "tools_used":
             tool_outputs,
 
@@ -109,6 +231,7 @@ async def chat(
             response
         }
 
+    # No tool needed
     response = (
         await GeminiService
         .generate_response(
@@ -117,6 +240,10 @@ async def chat(
     )
 
     return {
+
+        "trace":
+        trace,
+
         "response":
         response
     }
