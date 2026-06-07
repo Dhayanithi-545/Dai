@@ -1,5 +1,9 @@
 from pymongo import MongoClient
-from app.config.settings import settings
+import certifi
+
+from app.config.settings import (
+    settings
+)
 
 
 class MongoDB:
@@ -9,18 +13,29 @@ class MongoDB:
 
     @classmethod
     def connect(cls):
+
         try:
+
             cls.client = MongoClient(
-                settings.MONGO_URI
+                settings.MONGO_URI,
+                tls=True,
+                tlsCAFile=certifi.where()
             )
 
             cls.database = cls.client[
                 settings.DATABASE_NAME
             ]
 
-            print("MongoDB Connected Successfully")
+            cls.client.admin.command(
+                "ping"
+            )
+
+            print(
+                "MongoDB Connected Successfully"
+            )
 
         except Exception as e:
+
             print(
                 f"MongoDB Connection Error: {e}"
             )

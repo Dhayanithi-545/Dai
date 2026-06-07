@@ -13,10 +13,21 @@ from app.mcp.client.mcp_client import (
     MCPClient
 )
 
+from app.utils.prompt_loader import (
+    load_prompt
+)
+
+from app.services.memory_service import (
+    MemoryService
+)
+
+
 router = APIRouter()
 
 
-class ChatRequest(BaseModel):
+class ChatRequest(
+    BaseModel
+):
     message: str
 
 
@@ -31,22 +42,56 @@ async def chat(
 
     if plan["use_tool"]:
 
-        tool_result = (
-            await MCPClient.call_tool(
-                plan["tool_name"],
-                plan["arguments"]
+        tool_outputs = []
+
+        for tool in plan["tools"]:
+
+            vehicle_id = (
+                tool["arguments"]
+                .get("vehicle_id")
             )
+
+            if vehicle_id:
+
+                await MemoryService.save_vehicle_context(
+                    vehicle_id
+                )
+            else:
+
+                await MemoryService.clear_vehicle_context()
+
+            if not vehicle_id:
+
+                return {
+                    "response":
+                    "Please provide the vehicle ID."
+                }
+
+
+            result = (
+                await MCPClient.call_tool(
+                    tool["tool_name"],
+                    tool["arguments"]
+                )
+            )
+
+            tool_outputs.append({
+
+                "tool_name":
+                tool["tool_name"],
+
+                "result":
+                result
+            })
+
+        final_prompt = load_prompt(
+            "response_prompt.txt",
+            user_query=
+            request.message,
+
+            tool_results=
+            tool_outputs
         )
-
-        final_prompt = f"""
-User Question:
-{request.message}
-
-Tool Result:
-{tool_result}
-
-Answer professionally.
-"""
 
         response = (
             await GeminiService
@@ -56,11 +101,9 @@ Answer professionally.
         )
 
         return {
-            "tool_used":
-            plan["tool_name"],
 
-            "tool_result":
-            tool_result,
+            "tools_used":
+            tool_outputs,
 
             "response":
             response
@@ -74,6 +117,6 @@ Answer professionally.
     )
 
     return {
-        "tool_used": None,
-        "response": response
+        "response":
+        response
     }
