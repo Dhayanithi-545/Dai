@@ -192,7 +192,8 @@ const styles = {
   },
   userText: {
     fontFamily: "var(--font-body)",
-    fontWeight: 400,
+    fontWeight: 500,
+    color:"black",
   },
   markdownWrapper: {
     fontFamily: "var(--font-body)",

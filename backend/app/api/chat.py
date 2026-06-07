@@ -1,5 +1,10 @@
-from fastapi import APIRouter
-from pydantic import BaseModel
+from fastapi import (
+    APIRouter
+)
+
+from pydantic import (
+    BaseModel
+)
 
 from app.services.gemini_service import (
     GeminiService
@@ -29,6 +34,7 @@ from app.services.tool_validation_service import (
     ToolValidationService
 )
 
+
 router = APIRouter()
 
 
@@ -43,13 +49,19 @@ async def chat(
     request: ChatRequest
 ):
 
+    # -------------------------
     # Initialize Trace
+    # -------------------------
+
     trace = (
         TraceService
         .initialize()
     )
 
+    # -------------------------
     # Planner
+    # -------------------------
+
     plan = await (
         MCPPlanner.plan(
             request.message
@@ -57,6 +69,7 @@ async def chat(
     )
 
     TraceService.add_step(
+
         trace,
 
         "Planner Decision",
@@ -65,8 +78,13 @@ async def chat(
         f"{len(plan.get('tools', []))}"
     )
 
-    # Tool Flow
-    if plan.get("use_tool"):
+    # -------------------------
+    # TOOL FLOW
+    # -------------------------
+
+    if plan.get(
+        "use_tool"
+    ):
 
         tool_outputs = []
 
@@ -96,8 +114,12 @@ async def chat(
                 )
             )
 
-            # Trace selected tool
+            # -------------------------
+            # Trace Tool Selected
+            # -------------------------
+
             TraceService.add_step(
+
                 trace,
 
                 "Tool Selected",
@@ -105,29 +127,23 @@ async def chat(
                 tool_name
             )
 
-            # Vehicle ID validation
-            if not vehicle_id:
+            # -------------------------
+            # Save Vehicle Memory
+            # -------------------------
 
-                return {
-                    "trace":
-                    trace,
+            if vehicle_id:
 
-                    "response":
-                    (
-                        "Please provide "
-                        "the vehicle ID."
+                await (
+                    MemoryService
+                    .save_vehicle_context(
+                        vehicle_id
                     )
-                }
-
-            # Save memory
-            await (
-                MemoryService
-                .save_vehicle_context(
-                    vehicle_id
                 )
-            )
 
+            # -------------------------
             # Execute MCP Tool
+            # -------------------------
+
             result = (
                 await MCPClient
                 .call_tool(
@@ -135,6 +151,10 @@ async def chat(
                     arguments
                 )
             )
+
+            # -------------------------
+            # Tool Validation
+            # -------------------------
 
             validation = (
                 ToolValidationService
@@ -144,7 +164,9 @@ async def chat(
                 )
             )
 
-            if not validation["valid"]:
+            if not validation[
+                "valid"
+            ]:
 
                 TraceService.add_step(
 
@@ -164,16 +186,20 @@ async def chat(
 
                     "response":
                     (
-                        f"I could not "
-                        f"complete the "
-                        f"request.\n\n"
+                        "I could not "
+                        "complete the "
+                        "request.\n\n"
                         f"Reason: "
                         f"{validation['message']}"
                     )
                 }
 
-            # Trace execution
+            # -------------------------
+            # Trace Tool Execution
+            # -------------------------
+
             TraceService.add_step(
+
                 trace,
 
                 "Tool Executed",
@@ -190,10 +216,27 @@ async def chat(
                 result
             })
 
-        # Final response prompt
+        # -------------------------
+        # Identity Prompt
+        # -------------------------
+
+        identity_prompt = (
+            load_prompt(
+                "identity_prompt.txt"
+            )
+        )
+
+        # -------------------------
+        # Final Response Prompt
+        # -------------------------
+
         final_prompt = (
             load_prompt(
+
                 "response_prompt.txt",
+
+                identity_prompt=
+                identity_prompt,
 
                 user_query=
                 request.message,
@@ -204,6 +247,7 @@ async def chat(
         )
 
         TraceService.add_step(
+
             trace,
 
             "Response Generation",
@@ -231,11 +275,58 @@ async def chat(
             response
         }
 
-    # No tool needed
+    # -------------------------
+    # NO TOOL FLOW
+    # -------------------------
+
+    identity_prompt = (
+        load_prompt(
+            "identity_prompt.txt"
+        )
+    )
+
+    general_prompt = f"""
+{identity_prompt}
+
+User Query:
+{request.message}
+
+Instructions:
+
+1. Respond strictly
+as Dai.
+
+2. Never say
+you are Google,
+Gemini, or a
+general AI model.
+
+3. Stay inside
+Dhaya Electrics
+domain.
+
+4. If unrelated
+query:
+
+Politely explain
+that you are
+Dhaya Electrics'
+internal AI
+assistant.
+
+5. Maintain
+professional tone.
+
+6. Assume
+employee context.
+
+Generate response.
+"""
+
     response = (
         await GeminiService
         .generate_response(
-            request.message
+            general_prompt
         )
     )
 

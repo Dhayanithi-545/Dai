@@ -12,32 +12,35 @@ from app.utils.prompt_loader import (
     load_prompt
 )
 
-from app.services.memory_service import (
-    MemoryService
-)
 
 class MCPPlanner:
 
     @classmethod
     async def plan(
         cls,
-        user_query: str
+        user_query: str,
+        trace=None
     ):
 
-        previous_vehicle = (
-            await MemoryService
-            .get_last_vehicle()
+        identity_prompt = (
+            load_prompt(
+                "identity_prompt.txt"
+            )
         )
 
-        planner_prompt = load_prompt(
-            "planner_prompt.txt",
-            available_tools=
-            AVAILABLE_TOOLS,
-            user_query=
-            user_query,
+        planner_prompt = (
+            load_prompt(
+                "planner_prompt.txt",
 
-            previous_vehicle=
-            previous_vehicle
+                identity_prompt=
+                identity_prompt,
+
+                available_tools=
+                AVAILABLE_TOOLS,
+
+                user_query=
+                user_query
+            )
         )
 
         response = (
@@ -68,14 +71,9 @@ class MCPPlanner:
                 )
             )
 
-            print(
-                "\nPlanner Decision:"
-            )
-            print(
+            return (
                 parsed_response
             )
-
-            return parsed_response
 
         except Exception as e:
 
@@ -84,6 +82,10 @@ class MCPPlanner:
             )
 
             return {
-                "use_tool": False,
-                "tools": []
+
+                "use_tool":
+                False,
+
+                "tools":
+                []
             }

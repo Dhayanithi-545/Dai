@@ -1,26 +1,34 @@
 from pathlib import Path
 
 
+PROMPTS_DIR = (
+    Path(__file__)
+    .resolve()
+    .parent.parent
+    / "mcp"
+    / "prompts"
+)
+
+
 def load_prompt(
-    filename: str,
+    file_name: str,
     **kwargs
 ):
 
-    prompt_path = (
-        Path(__file__)
-        .parent.parent
-        / "mcp"
-        / "prompts"
-        / filename
+    file_path = (
+        PROMPTS_DIR
+        / file_name
     )
 
     with open(
-        prompt_path,
+        file_path,
         "r",
         encoding="utf-8"
     ) as file:
 
-        prompt = file.read()
+        prompt = (
+            file.read()
+        )
 
     return prompt.format(
         **kwargs
