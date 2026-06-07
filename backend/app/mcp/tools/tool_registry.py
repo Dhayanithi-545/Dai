@@ -6,6 +6,30 @@ from app.mcp.tools.maintenance_tool import (
     MaintenanceTool
 )
 
+from app.mcp.tools.vehicle_catalog_tool import (
+    VehicleCatalogTool
+)
+
+from app.mcp.tools.fleet_summary_tool import (
+    FleetSummaryTool
+)
+
+from app.mcp.tools.sales_tool import (
+    SalesTool
+)
+
+from app.mcp.tools.production_tool import (
+    ProductionTool
+)
+
+from app.mcp.tools.plant_analytics_tool import (
+    PlantAnalyticsTool
+)
+
+from app.mcp.tools.executive_summary_tool import (
+    ExecutiveSummaryTool
+)
+
 
 class ToolRegistry:
 
@@ -15,7 +39,25 @@ class ToolRegistry:
         VehicleHealthTool(),
 
         "maintenance_tool":
-        MaintenanceTool()
+        MaintenanceTool(),
+
+        "vehicle_catalog_tool":
+        VehicleCatalogTool(),
+
+        "fleet_summary_tool":
+        FleetSummaryTool(),
+
+        "sales_tool":
+        SalesTool(),
+
+        "production_tool":
+        ProductionTool(),
+
+        "plant_analytics_tool":
+        PlantAnalyticsTool(),
+
+        "executive_summary_tool":
+        ExecutiveSummaryTool()
     }
 
     @classmethod
@@ -23,6 +65,7 @@ class ToolRegistry:
         cls,
         tool_name: str
     ):
+
         return cls.tools.get(
             tool_name
         )
