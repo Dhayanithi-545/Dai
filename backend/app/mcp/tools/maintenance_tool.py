@@ -7,12 +7,15 @@ from app.mcp.resources.vehicle_resource import (
 )
 
 
-class VehicleHealthTool(BaseTool):
+class MaintenanceTool(
+    BaseTool
+):
 
-    name = "vehicle_health_tool"
+    name = "maintenance_tool"
 
     description = (
-        "Get EV vehicle health"
+        "Get maintenance "
+        "details of a vehicle"
     )
 
     async def execute(
@@ -38,24 +41,18 @@ class VehicleHealthTool(BaseTool):
             "vehicle_id":
             vehicle["vehicle_id"],
 
-            "battery_health":
-            vehicle[
-                "battery_health"
-            ],
-
-            "temperature":
-            vehicle[
-                "temperature"
-            ],
-
-            "status":
-            vehicle["status"],
-
-            "range_km":
-            vehicle["range_km"],
-
             "maintenance_due":
             vehicle[
                 "maintenance_due"
+            ],
+
+            "last_service_date":
+            vehicle[
+                "last_service_date"
+            ],
+
+            "maintenance_notes":
+            vehicle[
+                "maintenance_notes"
             ]
         }
