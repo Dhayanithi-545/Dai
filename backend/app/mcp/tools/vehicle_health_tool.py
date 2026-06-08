@@ -11,22 +11,15 @@ class VehicleHealthTool(BaseTool):
 
     name = "vehicle_health_tool"
 
-    description = (
-        "Get EV vehicle health"
-    )
-
+    description = "Get EV vehicle health"
+    
     async def execute(
         self,
         vehicle_id: str
     ):
 
-        vehicle = (
-            await VehicleResource
-            .get_vehicle(
-                vehicle_id
-            )
-        )
-
+        vehicle = await VehicleResource.get_vehicle(vehicle_id)
+        
         if not vehicle:
 
             return {

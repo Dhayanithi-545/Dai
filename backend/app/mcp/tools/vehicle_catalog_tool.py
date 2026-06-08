@@ -10,10 +10,7 @@ class VehicleCatalogTool:
         model_name: str
     ):
 
-        db = (
-            MongoDB
-            .get_database()
-        )
+        db = MongoDB.get_database()
 
         vehicle = (
             db.vehicle_catalog

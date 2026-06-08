@@ -24,7 +24,12 @@ function ChatPage({ initialQuery, onBack }) {
     try {
       const data = await sendMessage(message);
       setTrace(data.trace || []);
-      const botMessage = { role: "assistant", content: data.response };
+      const botMessage = {
+        role: "assistant",
+        content: data.response,
+        widgets: data.widgets || [],
+        insights: data.insights || [],
+      };
       setMessages((prev) => [...prev, botMessage]);
     } catch (error) {
       console.error(error);

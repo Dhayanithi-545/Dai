@@ -71,6 +71,8 @@ function ChatWindow({ messages, loading }) {
                 key={index}
                 role={message.role}
                 content={message.content}
+                widgets={message.widgets}
+                insights={message.insights}
                 isLast={index === messages.length - 1}
               />
             ))}

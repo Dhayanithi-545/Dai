@@ -3,8 +3,6 @@ from app.mcp.server.mcp_server import (
 )
 
 
-
-
 class MCPClient:
 
     @classmethod
