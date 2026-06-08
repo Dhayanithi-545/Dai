@@ -1,340 +1,134 @@
-from fastapi import (
-    APIRouter
-)
+import json
 
-from pydantic import (
-    BaseModel
-)
+from fastapi import APIRouter
+from pydantic import BaseModel
 
-from app.services.gemini_service import (
-    GeminiService
-)
-
-from app.mcp.planner.planner import (
-    MCPPlanner
-)
-
-from app.mcp.client.mcp_client import (
-    MCPClient
-)
-
-from app.utils.prompt_loader import (
-    load_prompt
-)
-
-from app.services.memory_service import (
-    MemoryService
-)
-
-from app.services.trace_service import (
-    TraceService
-)
-
-from app.services.tool_validation_service import (
-    ToolValidationService
-)
+from app.services.gemini_service import GeminiService
+from app.mcp.planner.planner import MCPPlanner
+from app.mcp.client.mcp_client import MCPClient
+from app.utils.prompt_loader import load_prompt
+from app.services.memory_service import MemoryService
+from app.services.trace_service import TraceService
+from app.services.tool_validation_service import ToolValidationService
+from app.services.visualization_service import VisualizationService
 
 
 router = APIRouter()
 
 
-class ChatRequest(
-    BaseModel
-):
+class ChatRequest(BaseModel):
     message: str
 
 
 @router.post("/")
-async def chat(
-    request: ChatRequest
-):
+async def chat(request: ChatRequest):
+    trace = TraceService.initialize()
 
-    # -------------------------
-    # Initialize Trace
-    # -------------------------
-
-    trace = (
-        TraceService
-        .initialize()
-    )
-
-    # -------------------------
-    # Planner
-    # -------------------------
-
-    plan = await (
-        MCPPlanner.plan(
-            request.message
-        )
-    )
+    plan = await MCPPlanner.plan(request.message)
+    intent = plan.get("intent", "lookup")
+    tools_planned = plan.get("tools", [])
 
     TraceService.add_step(
-
         trace,
-
         "Planner Decision",
-
-        f"Tool count: "
-        f"{len(plan.get('tools', []))}"
+        f"Intent: {intent} | Tools: {len(tools_planned)}",
     )
 
-    # -------------------------
-    # TOOL FLOW
-    # -------------------------
+    await MemoryService.save_context(
+        intent=intent,
+        query=request.message,
+    )
 
-    if plan.get(
-        "use_tool"
-    ):
-
+    if plan.get("use_tool") and tools_planned:
         tool_outputs = []
+        errors = []
 
-        for tool in (
-            plan.get(
-                "tools",
-                []
-            )
-        ):
+        for tool in tools_planned:
+            tool_name = tool.get("tool_name")
+            arguments = tool.get("arguments", {})
 
-            tool_name = (
-                tool.get(
-                    "tool_name"
-                )
-            )
+            TraceService.add_step(trace, "Tool Selected", f"{tool_name} | {arguments}")
 
-            arguments = (
-                tool.get(
-                    "arguments",
-                    {}
-                )
-            )
-
-            vehicle_id = (
-                arguments.get(
-                    "vehicle_id"
-                )
-            )
-
-            # -------------------------
-            # Trace Tool Selected
-            # -------------------------
-
-            TraceService.add_step(
-
-                trace,
-
-                "Tool Selected",
-
-                tool_name
-            )
-
-            # -------------------------
-            # Save Vehicle Memory
-            # -------------------------
-
-            if vehicle_id:
-
-                await (
-                    MemoryService
-                    .save_vehicle_context(
-                        vehicle_id
-                    )
+            if arguments.get("vehicle_id"):
+                await MemoryService.save_context(vehicle_id=arguments["vehicle_id"])
+            if arguments.get("model_name"):
+                await MemoryService.save_context(model_name=arguments["model_name"])
+            if arguments.get("plant") or arguments.get("plant_name"):
+                await MemoryService.save_context(
+                    plant=arguments.get("plant") or arguments.get("plant_name")
                 )
 
-            # -------------------------
-            # Execute MCP Tool
-            # -------------------------
+            result = await MCPClient.call_tool(tool_name, arguments)
+            validation = ToolValidationService.validate_tool_result(tool_name, result)
 
-            result = (
-                await MCPClient
-                .call_tool(
-                    tool_name,
-                    arguments
-                )
-            )
+            if not validation["valid"]:
+                TraceService.add_step(trace, "Tool Warning", validation["message"])
+                errors.append({"tool_name": tool_name, "error": validation["message"]})
+                tool_outputs.append({
+                    "tool_name": tool_name,
+                    "result": {"error": validation["message"]},
+                })
+                continue
 
-            # -------------------------
-            # Tool Validation
-            # -------------------------
+            TraceService.add_step(trace, "Tool Executed", tool_name)
+            tool_outputs.append({"tool_name": tool_name, "result": result})
 
-            validation = (
-                ToolValidationService
-                .validate_tool_result(
-                    tool_name,
-                    result
-                )
-            )
+        if not any(not o["result"].get("error") for o in tool_outputs):
+            return {
+                "type": "analytics_response",
+                "trace": trace,
+                "response": (
+                    "I could not retrieve the requested data.\n\n"
+                    + "\n".join(f"- {e['tool_name']}: {e['error']}" for e in errors)
+                ),
+                "widgets": [],
+                "insights": [],
+            }
 
-            if not validation[
-                "valid"
-            ]:
+        widgets = VisualizationService.generate_widgets(tool_outputs, plan)
+        insights = VisualizationService.generate_insights(tool_outputs, plan)
 
-                TraceService.add_step(
+        identity_prompt = load_prompt("identity_prompt.txt")
 
-                    trace,
-
-                    "Tool Failure",
-
-                    validation[
-                        "message"
-                    ]
-                )
-
-                return {
-
-                    "trace":
-                    trace,
-
-                    "response":
-                    (
-                        "I could not "
-                        "complete the "
-                        "request.\n\n"
-                        f"Reason: "
-                        f"{validation['message']}"
-                    )
-                }
-
-            # -------------------------
-            # Trace Tool Execution
-            # -------------------------
-
-            TraceService.add_step(
-
-                trace,
-
-                "Tool Executed",
-
-                tool_name
-            )
-
-            tool_outputs.append({
-
-                "tool_name":
-                tool_name,
-
-                "result":
-                result
-            })
-
-        # -------------------------
-        # Identity Prompt
-        # -------------------------
-
-        identity_prompt = (
-            load_prompt(
-                "identity_prompt.txt"
-            )
+        final_prompt = load_prompt(
+            "response_prompt.txt",
+            identity_prompt=identity_prompt,
+            user_query=request.message,
+            intent=intent,
+            tool_results=json.dumps(tool_outputs, indent=2, default=str),
         )
 
-        # -------------------------
-        # Final Response Prompt
-        # -------------------------
+        TraceService.add_step(trace, "Response Generation", "Gemini synthesizing tool outputs")
 
-        final_prompt = (
-            load_prompt(
-
-                "response_prompt.txt",
-
-                identity_prompt=
-                identity_prompt,
-
-                user_query=
-                request.message,
-
-                tool_results=
-                tool_outputs
-            )
-        )
-
-        TraceService.add_step(
-
-            trace,
-
-            "Response Generation",
-
-            "Gemini synthesizing "
-            "tool outputs"
-        )
-
-        response = (
-            await GeminiService
-            .generate_response(
-                final_prompt
-            )
-        )
+        response = await GeminiService.generate_response(final_prompt)
 
         return {
-
-            "trace":
-            trace,
-
-            "tools_used":
-            tool_outputs,
-
-            "response":
-            response
+            "type": "analytics_response",
+            "trace": trace,
+            "tools_used": tool_outputs,
+            "response": response,
+            "summary": response,
+            "widgets": widgets,
+            "insights": insights,
+            "intent": intent,
         }
 
-    # -------------------------
-    # NO TOOL FLOW
-    # -------------------------
+    identity_prompt = load_prompt("identity_prompt.txt")
 
-    identity_prompt = (
-        load_prompt(
-            "identity_prompt.txt"
-        )
+    general_prompt = load_prompt(
+        "fallback_prompt.txt",
+        identity_prompt=identity_prompt,
+        user_query=request.message,
     )
 
-    general_prompt = f"""
-{identity_prompt}
+    TraceService.add_step(trace, "Response Generation", "Direct response (no tools)")
 
-User Query:
-{request.message}
-
-Instructions:
-
-1. Respond strictly
-as Dai.
-
-2. Never say
-you are Google,
-Gemini, or a
-general AI model.
-
-3. Stay inside
-Dhaya Electrics
-domain.
-
-4. If unrelated
-query:
-
-Politely explain
-that you are
-Dhaya Electrics'
-internal AI
-assistant.
-
-5. Maintain
-professional tone.
-
-6. Assume
-employee context.
-
-Generate response.
-"""
-
-    response = (
-        await GeminiService
-        .generate_response(
-            general_prompt
-        )
-    )
+    response = await GeminiService.generate_response(general_prompt)
 
     return {
-
-        "trace":
-        trace,
-
-        "response":
-        response
+        "type": "analytics_response",
+        "trace": trace,
+        "response": response,
+        "widgets": [],
+        "insights": [],
     }

@@ -3,9 +3,9 @@ import { ArrowRight, Zap, ChevronRight } from "lucide-react";
 
 const PLACEHOLDERS = [
   "Compare EV-9 truck vs the Titan X range...",
-  "What's the battery life on the Glide Pro hoverboard?",
-  "Show me the Q2 manufacturing report...",
-  "Which bike handles best in monsoon conditions?",
+  "What's the battery life on the Glide Pro hoverboard TN-EV-404?",
+  "Show me the Chennai Plant manufacturing report...",
+  "Give me the fleet summary",
   "Ask DAI anything about Dhaya Electric...",
 ];
 

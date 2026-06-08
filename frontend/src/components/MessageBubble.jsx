@@ -3,6 +3,8 @@ import remarkGfm from "remark-gfm";
 import { Prism as SyntaxHighlighter } from "react-syntax-highlighter";
 import { atomDark } from "react-syntax-highlighter/dist/esm/styles/prism";
 import { User, Bot } from "lucide-react";
+import WidgetRenderer from "./widgets/WidgetRenderer";
+import InsightsPanel from "./widgets/InsightsPanel";
 
 function formatTime() {
   return new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
@@ -91,7 +93,7 @@ const markdownComponents = {
   },
 };
 
-function MessageBubble({ role, content, isLast }) {
+function MessageBubble({ role, content, widgets, insights, isLast }) {
   const isUser = role === "user";
   const time = formatTime();
 
@@ -126,6 +128,8 @@ function MessageBubble({ role, content, isLast }) {
               >
                 {content}
               </ReactMarkdown>
+              <WidgetRenderer widgets={widgets} />
+              <InsightsPanel insights={insights} />
             </div>
           )}
         </div>

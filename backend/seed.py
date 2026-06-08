@@ -22,6 +22,9 @@ from app.seeders.seed_sales import (
     seed_sales
 )
 
+from app.seeders.seed_telematics import (
+    seed_telematics
+)
 
 def main():
 
@@ -36,6 +39,8 @@ def main():
     seed_manufacturing()
 
     seed_sales()
+
+    seed_telematics()
 
     print(
         "\nAll database "
