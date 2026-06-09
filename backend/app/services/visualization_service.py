@@ -23,6 +23,7 @@ class VisualizationService:
                 "rows": catalog_rows,
             })
 
+
         for output in tool_outputs:
             if output.get("error"):
                 continue

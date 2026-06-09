@@ -14,8 +14,12 @@ from app.database.mongodb import (
     MongoDB
 )
 
+from app.mcp.client.mcp_client import (
+    MCPClient
+)
+
 app = FastAPI(
-    title="Dai AI Agent"
+    title="Dai AI Agent for Dhaya Electric :)"
 )
 
 # CORS
@@ -42,6 +46,16 @@ app.add_middleware(
 async def startup():
 
     MongoDB.connect()
+    await MCPClient.connect()
+
+
+@app.on_event(
+    "shutdown"
+)
+async def shutdown():
+
+    await MCPClient.disconnect()
+    MongoDB.close()
 
 
 app.include_router(

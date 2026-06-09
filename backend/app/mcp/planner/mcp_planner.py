@@ -3,7 +3,7 @@ import re
 
 from app.services.gemini_service import GeminiService
 from app.services.memory_service import MemoryService
-from app.mcp.tools.tool_descriptions import AVAILABLE_TOOLS
+from app.mcp.client.mcp_client import MCPClient
 from app.utils.prompt_loader import load_prompt
 
 
@@ -17,10 +17,12 @@ class MCPPlanner:
 
         identity_prompt = load_prompt("identity_prompt.txt")
 
+        available_tools = MCPClient.format_tools_for_planner()
+
         planner_prompt = load_prompt(
             "planner_prompt.txt",
             identity_prompt=identity_prompt,
-            available_tools=AVAILABLE_TOOLS,
+            available_tools=available_tools,
             user_query=enriched_query,
             conversation_context=context_text,
         )

@@ -4,7 +4,7 @@ from fastapi import APIRouter
 from pydantic import BaseModel
 
 from app.services.gemini_service import GeminiService
-from app.mcp.planner.planner import MCPPlanner
+from app.mcp.planner.mcp_planner import MCPPlanner
 from app.mcp.client.mcp_client import MCPClient
 from app.utils.prompt_loader import load_prompt
 from app.services.memory_service import MemoryService
@@ -23,6 +23,9 @@ class ChatRequest(BaseModel):
 @router.post("/")
 async def chat(request: ChatRequest):
     trace = TraceService.initialize()
+
+    TraceService.add_step(trace, "MCP Initialize", MCPClient.get_connection_info())
+    TraceService.add_step(trace, "MCP List Tools", MCPClient.get_tools_summary())
 
     plan = await MCPPlanner.plan(request.message)
     intent = plan.get("intent", "lookup")
@@ -47,7 +50,7 @@ async def chat(request: ChatRequest):
             tool_name = tool.get("tool_name")
             arguments = tool.get("arguments", {})
 
-            TraceService.add_step(trace, "Tool Selected", f"{tool_name} | {arguments}")
+            TraceService.add_step(trace, "MCP Tool Selected", f"{tool_name} | {arguments}")
 
             if arguments.get("vehicle_id"):
                 await MemoryService.save_context(vehicle_id=arguments["vehicle_id"])
@@ -70,7 +73,7 @@ async def chat(request: ChatRequest):
                 })
                 continue
 
-            TraceService.add_step(trace, "Tool Executed", tool_name)
+            TraceService.add_step(trace, "MCP Call Tool", f"{tool_name} → success")
             tool_outputs.append({"tool_name": tool_name, "result": result})
 
         if not any(not o["result"].get("error") for o in tool_outputs):
