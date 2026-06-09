@@ -43,3 +43,10 @@ class MongoDB:
     @classmethod
     def get_database(cls):
         return cls.database
+
+    @classmethod
+    def close(cls):
+        if cls.client:
+            cls.client.close()
+            cls.client = None
+            cls.database = None
